@@ -3,10 +3,15 @@ import telebot
 from groq import Groq
 from dotenv import load_dotenv
 
+# 로컬 개발 시 .env 파일 로드 (Render에서는 무시됨)
 load_dotenv()
 
+# Render 환경변수에서 불러오기
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not TELEGRAM_TOKEN or not GROQ_API_KEY:
+    raise ValueError("환경변수 TELEGRAM_TOKEN 또는 GROQ_API_KEY가 설정되지 않았습니다.")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 groq_client = Groq(api_key=GROQ_API_KEY)
@@ -14,13 +19,13 @@ groq_client = Groq(api_key=GROQ_API_KEY)
 # 대화 기록 저장 (메모리)
 user_histories = {}
 SYSTEM_PROMPT = "당신은 도움이 되고 친절한 AI 어시스턴트입니다. 한국어로 자연스럽고 정확하게 대답하세요."
-MAX_TURNS = 8  # 최근 대화 턴 수 제한 (메모리 절약)
+MAX_TURNS = 8  # 최근 대화 턴 수 제한
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     chat_id = message.chat.id
     user_histories[chat_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    bot.reply_to(message, 
+    bot.reply_to(message,
         "🦙 **Llama 3.3 70B Versatile** 챗봇입니다!\n\n"
         "자유롭게 질문하세요.\n"
         "• `/reset` - 대화 초기화\n"
@@ -37,14 +42,14 @@ def handle_message(message):
     chat_id = message.chat.id
     user_text = message.text
 
-    # 히스토리 없으면 초기화
+    # 히스토리 초기화
     if chat_id not in user_histories:
         user_histories[chat_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     # 사용자 메시지 추가
     user_histories[chat_id].append({"role": "user", "content": user_text})
 
-    # 히스토리 길이 제한 (system + 최근 대화만 유지)
+    # 히스토리 길이 제한
     if len(user_histories[chat_id]) > MAX_TURNS * 2 + 1:
         user_histories[chat_id] = [user_histories[chat_id][0]] + user_histories[chat_id][-(MAX_TURNS*2):]
 
@@ -75,9 +80,9 @@ def handle_message(message):
 
     except Exception as e:
         bot.send_message(chat_id, f"❌ 오류가 발생했습니다.\n\n{str(e)}\n\n잠시 후 다시 시도해주세요.")
-        # 오류 발생 시 마지막 user 메시지 제거
-        if user_histories[chat_id][-1]["role"] == "user":
+        # 오류 시 마지막 user 메시지 제거
+        if user_histories[chat_id] and user_histories[chat_id][-1]["role"] == "user":
             user_histories[chat_id].pop()
 
-print("🤖 봇이 실행 중입니다...")
+print("🤖 Llama 3.3 챗봇이 실행 중입니다...")
 bot.infinity_polling()
